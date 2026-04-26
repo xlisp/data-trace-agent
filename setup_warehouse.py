@@ -73,6 +73,7 @@ def _reset(conn: sqlite3.Connection) -> None:
         "customer_a_orders_raw",
         "customer_b_orders_raw",
         "daily_metrics",
+        "_field_lineage",
     ):
         cur.execute(f"DROP TABLE IF EXISTS {t}")
     conn.commit()
@@ -118,7 +119,32 @@ def _create_schema(conn: sqlite3.Connection) -> None:
             total_orders   INTEGER NOT NULL,
             total_revenue  REAL    NOT NULL
         );
+        CREATE TABLE _field_lineage (
+            target_table   TEXT NOT NULL,
+            target_field   TEXT NOT NULL,
+            source_table   TEXT NOT NULL,
+            source_field   TEXT NOT NULL,
+            transform      TEXT NOT NULL,
+            etl_job        TEXT NOT NULL,
+            PRIMARY KEY (target_table, target_field, source_table, source_field)
+        );
         """
+    )
+    conn.commit()
+
+
+def _seed_lineage(conn: sqlite3.Connection) -> None:
+    cur = conn.cursor()
+    rows = []
+    for tgt_t, tgt_f, src_ts, src_fs, note in LINEAGE:
+        # The note doubles as transform description; etl_job is parsed from it.
+        etl_job = note.split("`")[1] if "`" in note else ""
+        for src_t, src_f in zip(src_ts, src_fs):
+            rows.append((tgt_t, tgt_f, src_t, src_f, note, etl_job))
+    cur.executemany(
+        "INSERT INTO _field_lineage(target_table, target_field, source_table, source_field, transform, etl_job)"
+        " VALUES (?,?,?,?,?,?)",
+        rows,
     )
     conn.commit()
 
@@ -227,6 +253,7 @@ def main() -> None:
     try:
         _reset(conn)
         _create_schema(conn)
+        _seed_lineage(conn)
         _seed_raw(conn)
         _aggregate(conn)
         cur = conn.cursor()
