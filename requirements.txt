@@ -1,0 +1,8 @@
+langgraph 
+langchain-openai 
+langchain-mcp-adapters 
+"mcp[cli]" 
+faker 
+pytest 
+pytest-asyncio
+
