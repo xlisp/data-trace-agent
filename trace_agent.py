@@ -140,9 +140,12 @@ async def build_agent():
     return client, agent
 
 
-async def ask(agent, history: list, user_text: str) -> str:
+async def ask(agent, history: list, user_text: str, recursion_limit: int = 60) -> str:
     history.append(HumanMessage(content=user_text))
-    result = await agent.ainvoke({"messages": history})
+    result = await agent.ainvoke(
+        {"messages": history},
+        config={"recursion_limit": recursion_limit},
+    )
     msgs = result["messages"]
     history.clear()
     history.extend(msgs)
