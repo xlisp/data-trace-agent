@@ -4,8 +4,8 @@ A LangGraph `create_react_agent` that answers data-lineage / data-support /
 ETL-bug questions against a tiny simulated warehouse, by combining two MCP
 servers:
 
-- [`sqllite-mcp-server`](../sqllite-mcp-server) — SQL access to the warehouse
-- [`filesystem-mcp-server`](../filesystem-mcp-server-github) — read raw upstream
+- [`sqllite-mcp-server`](./mcp/filesystem_mcp_server.py) — SQL access to the warehouse
+- [`filesystem-mcp-server`](./mcp/sqllite_mcp_server.py) — read raw upstream
   files on disk
 
 You need both to find ETL bugs: querying the DB tells you "what's there"; reading

@@ -2,8 +2,8 @@
 
 一个基于 LangGraph `create_react_agent` 的智能体，通过组合两个 MCP 服务器，针对一个小型的模拟数据仓库回答数据血缘 / 数据支持 / ETL bug 相关的问题：
 
-- [`sqllite-mcp-server`](../sqllite-mcp-server) — 提供对数据仓库的 SQL 访问能力
-- [`filesystem-mcp-server`](../filesystem-mcp-server-github) — 读取磁盘上的原始上游文件
+- [`sqllite-mcp-server`](./mcp/filesystem_mcp_server.py) — 提供对数据仓库的 SQL 访问能力
+- [`filesystem-mcp-server`](./mcp/sqllite_mcp_server.py) — 读取磁盘上的原始上游文件
 
 要找出 ETL bug，两个工具缺一不可：查询数据库告诉你"现在有什么"；读取源文件告诉你"本来应该有什么"。两者之间的差异，就是 bug。
 
