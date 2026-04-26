@@ -35,10 +35,9 @@ from langgraph.prebuilt import create_react_agent
 from setup_warehouse import DB_PATH
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-SQLITE_MCP_DIR = "/Users/xlisp/PyPro/sqllite-mcp-server"
-SQLITE_MCP_MAIN = os.path.join(SQLITE_MCP_DIR, "main.py")
-FS_MCP_DIR = "/Users/xlisp/PyPro/filesystem-mcp-server-github"
-FS_MCP_MAIN = os.path.join(FS_MCP_DIR, "filesystem.py")
+MCP_DIR = "/Users/xlisp/PyPro/data-trace-agent/mcp"
+SQLITE_MCP_MAIN = os.path.join(MCP_DIR, "sqllite_mcp_server.py")
+FS_MCP_MAIN = os.path.join(MCP_DIR, "filesystem_mcp_server.py")
 SOURCES_DIR = os.path.join(_HERE, "data", "sources")
 
 
