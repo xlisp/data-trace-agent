@@ -95,7 +95,7 @@ def _make_llm() -> ChatOpenAI:
     return ChatOpenAI(model=model_name, base_url=base_url, api_key=api_key, temperature=0)
 
 
-async def _build_agent():
+async def build_agent():
     client = MultiServerMCPClient({
         "sqlite-db": {
             "command": sys.executable,
@@ -110,7 +110,7 @@ async def _build_agent():
     return client, agent
 
 
-async def _ask(agent, history: list, user_text: str) -> str:
+async def ask(agent, history: list, user_text: str) -> str:
     history.append(HumanMessage(content=user_text))
     result = await agent.ainvoke({"messages": history})
     msgs = result["messages"]
@@ -130,7 +130,7 @@ SAMPLE_QUESTIONS = [
 
 
 async def main() -> None:
-    client, agent = await _build_agent()
+    _client, agent = await build_agent()
     print("\n=== data-trace-agent ready ===")
     print("Sample questions you can try:")
     for q in SAMPLE_QUESTIONS:
@@ -147,7 +147,7 @@ async def main() -> None:
             if not q:
                 break
             try:
-                ans = await _ask(agent, history, q)
+                ans = await ask(agent, history, q)
             except Exception as e:
                 print(f"[error] {e}", file=sys.stderr)
                 continue
