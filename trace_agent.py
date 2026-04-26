@@ -4,10 +4,17 @@ data-trace-agent — POC
 A LangGraph ReAct agent that answers data-lineage / data-support questions
 against a tiny simulated warehouse.
 
-It connects to the existing `sqllite-mcp-server` over stdio to get its tools
-(execute_query, describe_table, ...) and runs a REPL. Lineage metadata lives in
-a `_field_lineage` table inside the warehouse db itself (the MCP server's
-in-memory `add_field_lineage` tracker is per-session and not used here).
+It connects to two MCP servers over stdio:
+  - `sqllite-mcp-server`         — execute_query, describe_table, ...
+  - `filesystem-mcp-server`      — read_file, list_directory, search_files_ag, ...
+
+The DB tools answer "what's in the warehouse"; the filesystem tools answer
+"what was actually in the upstream file the loader saw" — without both, the
+agent cannot find ETL bugs that change the value between source and DB
+(e.g. file says 99.99, DB says 99).
+
+Lineage metadata lives in `_field_lineage` and `_source_registry` tables
+inside the warehouse db.
 
 Run:
     python3 setup_warehouse.py        # one-time: build data/warehouse.db
@@ -30,31 +37,31 @@ from setup_warehouse import DB_PATH
 _HERE = os.path.dirname(os.path.abspath(__file__))
 SQLITE_MCP_DIR = "/Users/xlisp/PyPro/sqllite-mcp-server"
 SQLITE_MCP_MAIN = os.path.join(SQLITE_MCP_DIR, "main.py")
+FS_MCP_DIR = "/Users/xlisp/PyPro/filesystem-mcp-server-github"
+FS_MCP_MAIN = os.path.join(FS_MCP_DIR, "filesystem.py")
+SOURCES_DIR = os.path.join(_HERE, "data", "sources")
 
 
 SYSTEM_PROMPT = f"""\
 You are a Data Lineage / Data Support agent.
 
-You help engineers answer two kinds of questions about a data warehouse:
+You answer three kinds of questions about a data warehouse:
 
   1. **Anomaly explanation** — "today's value of field X dropped vs last month, why?"
-     Approach: pull the recent series for the aggregated field, identify the
-     anomalous date, look up the field's lineage in `_field_lineage`, then query
-     each upstream source for the same date to localise the change.
-
   2. **Lineage / provenance** — "where does field X come from upstream?"
-     Approach: query `_field_lineage` for rows where `target_table` and
-     `target_field` match. Each row gives one (source_table, source_field) plus
-     the `transform` description and `etl_job` name.
+  3. **ETL discrepancy hunt** — "the DB value for X looks wrong; does it match
+     what the upstream file actually contained?"
 
-# The warehouse you operate on
+You MUST be willing to read both the database and the raw source files on disk
+to answer (3) — a value that is correct in the upstream file but wrong in the
+DB means the loader / ETL has a bug. You cannot find that by querying SQL alone.
 
-The SQLite database is at: `{DB_PATH}`
+# Warehouse SQLite database
 
-You MUST pass that exact path as the `db_path` argument to every SQL tool
-(`execute_query`, `describe_table`, etc.).
+Path: `{DB_PATH}`
+Always pass this exact path as the `db_path` arg to SQL tools.
 
-User-facing tables (raw upstream sources + downstream aggregate):
+Tables:
   - `s3_clickstream_raw`       (events from `s3://events/clickstream`)
   - `app_logs_raw`             (events from `fluentd://app-logs`)
   - `customer_a_orders_raw`    (orders feed from `sftp://customer-a/orders`)
@@ -63,26 +70,43 @@ User-facing tables (raw upstream sources + downstream aggregate):
                                 total_events, active_users, total_orders,
                                 total_revenue)
 
-Metadata table — your authoritative lineage store:
+Metadata tables — your authoritative lineage / source map:
   - `_field_lineage(target_table, target_field, source_table, source_field,
                     transform, etl_job)`
-    One row per (target_field, source_field) edge. Always consult this first
-    for any lineage question.
+      One row per (target_field, source_field) edge. Read this FIRST for any
+      lineage question.
+  - `_source_registry(source_table, source_uri, file_dir, loader, schema_note)`
+      For each raw source table, where its physical file lives on disk and what
+      the file format is. Read this when you need to compare DB rows against
+      the upstream source file.
 
-Each raw table also has a `source` column carrying the upstream URI so you can
-name the offending feed when you find one.
+# Upstream source files on disk
 
-Today's date is 2026-04-26. "Last month" means the prior 30 days for this POC.
+Root directory: `{SOURCES_DIR}`
+Files for a given day are at `<file_dir>/<YYYY-MM-DD>.<ext>` — e.g.
+`{SOURCES_DIR}/customer_b/2026-04-26.csv`. Use the filesystem tools
+(`read_file`, `list_directory`, `search_files_ag`, `execute_command`) to read
+them. CSVs have a header row.
+
+Today's date is 2026-04-26. "Last month" means the prior 30 days.
 
 # How to work
 
-- Be concrete. Run SQL. Cite numbers and the row(s) you got them from.
-- When you suspect a drop in an aggregate, compare today vs the average / median
-  of the prior window, look up lineage in `_field_lineage`, then drill into each
-  upstream source's row count / sum for the same day.
-- When you've identified the upstream cause, name the source URI
-  (e.g. `api://customer-b/orders`) so the user knows who to page.
-- Keep replies short. Numbers > prose.
+- Numbers > prose. Run SQL. Cite the rows you got numbers from.
+
+- Anomaly playbook: query the recent series, compute today vs prior-30d
+  average, look up lineage in `_field_lineage`, then drill into each upstream
+  raw table for the same day. If a raw table looks short, *also* look up its
+  file in `_source_registry` and read the file with the filesystem tools — the
+  file may contain rows the loader silently dropped.
+
+- Discrepancy playbook: when comparing DB and source, pick a small set of
+  primary keys, read the source file, parse the matching rows, and contrast
+  the values column-by-column. Name the loader (from `_source_registry`) when
+  you accuse one of being buggy.
+
+- When you identify the offending feed or loader, name BOTH the source URI
+  (e.g. `api://customer-b/orders`) and the loader (e.g. `load_customer_b_orders`).
 """
 
 
@@ -102,6 +126,12 @@ async def build_agent():
             "args": [SQLITE_MCP_MAIN],
             "transport": "stdio",
             "cwd": SQLITE_MCP_DIR,
+        },
+        "filesystem": {
+            "command": sys.executable,
+            "args": [FS_MCP_MAIN],
+            "transport": "stdio",
+            "cwd": FS_MCP_DIR,
         },
     })
     tools = await client.get_tools()
@@ -125,7 +155,8 @@ async def ask(agent, history: list, user_text: str) -> str:
 SAMPLE_QUESTIONS = [
     "Today's total_revenue in daily_metrics looks low compared to last month. By how much, and why?",
     "Where does daily_metrics.total_events come from upstream? Show me the lineage.",
-    "Compared with the prior 30 days, which fields in daily_metrics moved most today, and which upstream source is responsible for each?",
+    "For today's customer_b_orders_raw rows, do the DB amounts match the upstream source file? If they differ, why?",
+    "For today's customer_a_orders_raw rows, do the DB amounts match the upstream source file exactly? Pick a few primary keys and compare.",
 ]
 
 
