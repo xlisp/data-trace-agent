@@ -24,10 +24,11 @@ Run:
 from __future__ import annotations
 
 import asyncio
+import json
 import os
 import sys
 
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_openai import ChatOpenAI
 from langgraph.prebuilt import create_react_agent
@@ -139,16 +140,73 @@ async def build_agent():
     return client, agent
 
 
+# Args we want to surface prominently in the tool-call log (the actual SQL,
+# the shell command, the file path being read, etc.). Order matters: first
+# match wins.
+_PRIMARY_ARG_KEYS = (
+    "query", "sql", "command", "file_path", "directory_path",
+    "path", "expression", "table", "table_name",
+)
+
+
+def _truncate(text, n: int = 800) -> str:
+    text = str(text)
+    if len(text) <= n:
+        return text
+    return text[:n] + f"... [+{len(text) - n} chars truncated]"
+
+
+def _format_tool_call(name: str, args) -> str:
+    if not isinstance(args, dict):
+        return f"[tool-call] {name}({args!r})"
+
+    primary_key = next((k for k in _PRIMARY_ARG_KEYS if k in args), None)
+    rest = {k: v for k, v in args.items() if k != primary_key}
+    rest_blob = json.dumps(rest, ensure_ascii=False, default=str) if rest else ""
+
+    lines = [f"[tool-call] {name}"]
+    if primary_key is not None:
+        primary_val = str(args[primary_key])
+        if "\n" in primary_val or len(primary_val) > 80:
+            lines.append(f"  {primary_key}:")
+            for ln in primary_val.splitlines() or [primary_val]:
+                lines.append(f"    {ln}")
+        else:
+            lines.append(f"  {primary_key}: {primary_val}")
+    if rest_blob:
+        lines.append(f"  args: {rest_blob}")
+    return "\n".join(lines)
+
+
+def _print_message_event(m) -> None:
+    if isinstance(m, AIMessage):
+        for tc in getattr(m, "tool_calls", None) or []:
+            name = tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", "?")
+            args = tc.get("args") if isinstance(tc, dict) else getattr(tc, "args", {})
+            print("\n" + _format_tool_call(name, args), file=sys.stderr, flush=True)
+    elif isinstance(m, ToolMessage):
+        name = getattr(m, "name", "?") or "?"
+        print(f"[tool-result:{name}] {_truncate(m.content)}", file=sys.stderr, flush=True)
+
+
 async def ask(agent, history: list, user_text: str, recursion_limit: int = 60) -> str:
     history.append(HumanMessage(content=user_text))
-    result = await agent.ainvoke(
+    new_messages: list = []
+    async for chunk in agent.astream(
         {"messages": history},
         config={"recursion_limit": recursion_limit},
-    )
-    msgs = result["messages"]
-    history.clear()
-    history.extend(msgs)
-    for m in reversed(msgs):
+        stream_mode="updates",
+    ):
+        if not isinstance(chunk, dict):
+            continue
+        for update in chunk.values():
+            if not isinstance(update, dict):
+                continue
+            for m in update.get("messages", []) or []:
+                new_messages.append(m)
+                _print_message_event(m)
+    history.extend(new_messages)
+    for m in reversed(new_messages):
         if isinstance(m, AIMessage) and m.content:
             return m.content
     return "(no reply)"
