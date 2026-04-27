@@ -1,8 +1,10 @@
-langgraph 
-langchain-openai 
-langchain-mcp-adapters 
-"mcp[cli]" 
-faker 
-pytest 
+langgraph
+langchain-openai
+langchain-mcp-adapters
+"mcp[cli]"
+faker
+fastapi
+uvicorn
+pytest
 pytest-asyncio
 

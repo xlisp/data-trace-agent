@@ -178,20 +178,42 @@ def _format_tool_call(name: str, args) -> str:
     return "\n".join(lines)
 
 
-def _print_message_event(m) -> None:
+def _message_events(m):
+    """Convert one streamed LangGraph message into 0+ typed event dicts."""
     if isinstance(m, AIMessage):
         for tc in getattr(m, "tool_calls", None) or []:
             name = tc.get("name") if isinstance(tc, dict) else getattr(tc, "name", "?")
             args = tc.get("args") if isinstance(tc, dict) else getattr(tc, "args", {})
-            print("\n" + _format_tool_call(name, args), file=sys.stderr, flush=True)
+            yield {
+                "type": "tool_call",
+                "name": name,
+                "args": args if isinstance(args, dict) else {"_raw": str(args)},
+                "formatted": _format_tool_call(name, args),
+            }
+        if m.content:
+            yield {"type": "ai_text", "content": m.content}
     elif isinstance(m, ToolMessage):
         name = getattr(m, "name", "?") or "?"
-        print(f"[tool-result:{name}] {_truncate(m.content)}", file=sys.stderr, flush=True)
+        yield {
+            "type": "tool_result",
+            "name": name,
+            "content": str(m.content),
+            "preview": _truncate(m.content),
+        }
 
 
-async def ask(agent, history: list, user_text: str, recursion_limit: int = 60) -> str:
+async def astream_events(agent, history: list, user_text: str, recursion_limit: int = 60):
+    """Run one user turn and yield typed events as they arrive.
+
+    Mutates `history` in place so the caller can reuse it across turns. Yields:
+      {"type": "tool_call",   "name", "args", "formatted"}
+      {"type": "tool_result", "name", "content", "preview"}
+      {"type": "ai_text",     "content"}
+      {"type": "final",       "content"}     # last AI text of the turn
+    """
     history.append(HumanMessage(content=user_text))
     new_messages: list = []
+    final_text = ""
     async for chunk in agent.astream(
         {"messages": history},
         config={"recursion_limit": recursion_limit},
@@ -204,12 +226,25 @@ async def ask(agent, history: list, user_text: str, recursion_limit: int = 60) -
                 continue
             for m in update.get("messages", []) or []:
                 new_messages.append(m)
-                _print_message_event(m)
+                for ev in _message_events(m):
+                    if ev["type"] == "ai_text":
+                        final_text = ev["content"]
+                    yield ev
     history.extend(new_messages)
-    for m in reversed(new_messages):
-        if isinstance(m, AIMessage) and m.content:
-            return m.content
-    return "(no reply)"
+    yield {"type": "final", "content": final_text or "(no reply)"}
+
+
+async def ask(agent, history: list, user_text: str, recursion_limit: int = 60) -> str:
+    final_text = "(no reply)"
+    async for ev in astream_events(agent, history, user_text, recursion_limit):
+        t = ev["type"]
+        if t == "tool_call":
+            print("\n" + ev["formatted"], file=sys.stderr, flush=True)
+        elif t == "tool_result":
+            print(f"[tool-result:{ev['name']}] {ev['preview']}", file=sys.stderr, flush=True)
+        elif t == "final":
+            final_text = ev["content"]
+    return final_text
 
 
 SAMPLE_QUESTIONS = [
