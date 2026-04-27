@@ -124,13 +124,13 @@ async def build_agent():
             "command": sys.executable,
             "args": [SQLITE_MCP_MAIN],
             "transport": "stdio",
-            "cwd": SQLITE_MCP_DIR,
+            "cwd": MCP_DIR,
         },
         "filesystem": {
             "command": sys.executable,
             "args": [FS_MCP_MAIN],
             "transport": "stdio",
-            "cwd": FS_MCP_DIR,
+            "cwd": MCP_DIR,
         },
     })
     tools = await client.get_tools()
