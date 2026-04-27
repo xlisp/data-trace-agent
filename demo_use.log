@@ -1,0 +1,213 @@
+
+~/PyPro/data-trace-agent main
+base ❯ python setup_warehouse.py
+[ok] warehouse: /Users/xlisp/PyPro/data-trace-agent/data/warehouse.db
+[ok] sources:   /Users/xlisp/PyPro/data-trace-agent/data/sources
+[ok] today files: {'s3': '/Users/xlisp/PyPro/data-trace-agent/data/sources/s3_clickstream/2026-04-26.json', 'log': '/Users/xlisp/PyPro/data-trace-agent/data/sources/app_logs/2026-04-26.log', 'a': '/Users/xlisp/PyPro/data-trace-agent/data/sources/customer_a/2026-04-26.csv', 'b': '/Users/xlisp/PyPro/data-trace-agent/data/sources/customer_b/2026-04-26.csv'}
+[ok] last 5 days of daily_metrics:
+     ('2026-04-26', 1500, 479, 56, 6808.62)
+     ('2026-04-25', 1497, 480, 136, 18867.23)
+     ('2026-04-24', 1455, 480, 122, 17926.15)
+     ('2026-04-23', 1543, 479, 131, 19078.55)
+     ('2026-04-22', 1431, 478, 130, 18410.17)
+[ok] customer_b: file=80 rows  ->  DB=5 rows  (bug: dropped non-USD)
+[ok] customer_a: file=51 rows  ->  DB=51 rows  (bug: amount int-truncated)
+
+
+~/PyPro/data-trace-agent main*
+base ❯ python ./trace_agent.py
+[04/27/26 08:00:55] INFO     Processing request of type ListToolsRequest                         server.py:713
+[04/27/26 08:00:55] INFO     Processing request of type ListToolsRequest                         server.py:713
+[ok] loaded 18 MCP tools: ['connect_database', 'execute_query', 'describe_table', 'add_field_lineage', 'trace_field_lineage', 'analyze_query_lineage', 'generate_sample_data', 'import_csv', 'export_table_to_csv', 'read_file', 'write_file', 'append_file', 'list_directory', 'get_file_info', 'execute_command', 'get_current_directory', 'create_directory', 'search_files_ag']
+/Users/xlisp/PyPro/data-trace-agent/./trace_agent.py:138: LangGraphDeprecatedSinceV10: create_react_agent has been moved to `langchain.agents`. Please update your import to `from langchain.agents import create_agent`. Deprecated in LangGraph V1.0 to be removed in V2.0.
+  agent = create_react_agent(_make_llm(), tools, prompt=SYSTEM_PROMPT)
+
+=== data-trace-agent ready ===
+Sample questions you can try:
+  - Today's total_revenue in daily_metrics looks low compared to last month. By how much, and why?
+  - Where does daily_metrics.total_events come from upstream? Show me the lineage.
+  - For today's customer_b_orders_raw rows, do the DB amounts match the upstream source file? If they differ, why?
+  - For today's customer_a_orders_raw rows, do the DB amounts match the upstream source file exactly? Pick a few primary keys and compare.
+Type your question (blank line / Ctrl-D to quit).
+
+you> hi
+
+agent> Hello! I'm your Data Lineage and Data Support agent. I'm here to help you investigate issues in your data warehouse.
+
+I can assist you with:
+
+1. **Anomaly explanations** — If you notice unexpected changes in metrics (e.g., "Why did total_revenue drop today compared to last month?")
+
+2. **Lineage questions** — Tracing where fields come from upstream (e.g., "Where does the active_users field in daily_metrics come from?")
+
+3. **ETL discrepancy investigations** — Checking if database values match the source files to identify potential loader bugs (e.g., "Does the order data in the DB match what's in the source file?")
+
+I have access to:
+- Your warehouse database at `/Users/xlisp/PyPro/data-trace-agent/data/warehouse.db`
+- Source files in `/Users/xlisp/PyPro/data-trace-agent/data/sources`
+- Metadata tables that track field lineage and source registries
+
+Today's date is **2026-04-26**.
+
+What would you like me to investigate?
+
+you> 今天的 total_revenue 比上个月低很多——具体低了多少，根本原因是什么？也请检查一下上游原始源文件。
+[04/27/26 08:02:34] INFO     Processing request of type CallToolRequest                                                               server.py:713
+[04/27/26 08:02:34] INFO     Processing request of type CallToolRequest                                                               server.py:713
+[04/27/26 08:02:34] INFO     Processing request of type CallToolRequest                                                               server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+[04/27/26 08:02:41] INFO     Processing request of type CallToolRequest                                                               server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+[04/27/26 08:02:41] INFO     Processing request of type CallToolRequest                                                               server.py:713
+[04/27/26 08:02:41] INFO     Processing request of type CallToolRequest                                                               server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+[04/27/26 08:02:45] INFO     Processing request of type CallToolRequest                                                               server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+[04/27/26 08:02:45] INFO     Processing request of type CallToolRequest                                                               server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+[04/27/26 08:02:51] INFO     Processing request of type CallToolRequest                                                               server.py:713
+[04/27/26 08:02:51] INFO     Processing request of type CallToolRequest                                                               server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+[04/27/26 08:02:58] INFO     Processing request of type CallToolRequest                                                               server.py:713
+[04/27/26 08:02:58] INFO     Processing request of type CallToolRequest                                                               server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+[04/27/26 08:03:02] INFO     Processing request of type CallToolRequest                                                               server.py:713
+[04/27/26 08:03:02] INFO     Processing request of type CallToolRequest                                                               server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+[04/27/26 08:03:08] INFO     Processing request of type CallToolRequest                                                               server.py:713
+[04/27/26 08:03:08] INFO     Processing request of type CallToolRequest                                                               server.py:713
+[04/27/26 08:03:08] INFO     Processing request of type CallToolRequest                                                               server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+[04/27/26 08:03:14] INFO     Processing request of type CallToolRequest                                                               server.py:713
+[04/27/26 08:03:14] INFO     Processing request of type CallToolRequest                                                               server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+[04/27/26 08:03:20] INFO     Processing request of type CallToolRequest                                                               server.py:713
+[04/27/26 08:03:20] INFO     Processing request of type CallToolRequest                                                               server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+
+agent> ## 🔴 **调查结论：发现严重的 ETL Bug！**
+
+### **数据异常情况**
+
+**今天 (2026-04-26) 的 total_revenue 严重下降：**
+- **今天**: 6,808.62 美元
+- **过去30天平均**: 18,501.02 美元
+- **下降幅度**: **-63.2%** (少了 11,692.40 美元)
+- **过去30天范围**: 17,127.01 - 19,812.02 美元
+
+今天的收入是过去30天中**最低的**，远低于正常范围。
+
+---
+
+### **根本原因：`load_customer_b_orders` 加载器有 Bug**
+
+**问题详情：**
+
+1. **源文件 vs 数据库对比 (Customer B):**
+   - **源文件** (`api://customer-b/orders` → `/Users/xlisp/PyPro/data-trace-agent/data/sources/customer_b/2026-04-26.csv`):
+     - 总行数: **81 行** (包含 header，实际订单 80 条)
+     - USD 订单: **5 条**
+     - EUR 订单: **75 条**
+
+   - **数据库** (`customer_b_orders_raw`):
+     - 加载的订单: **仅 5 条**
+     - 全部是 USD 订单 (order_id 8000000-8000004)
+
+2. **Customer A 正常:**
+   - 源文件: 52 行 (51 条订单 + header)
+   - 数据库: 51 条订单 ✅
+   - 金额: 5,764.00 美元 ✅
+
+3. **收入构成对比:**
+   ```
+   2026-04-26:
+   - Customer A: 5,764.00 (51 订单)
+   - Customer B: 1,044.62 (仅 5 订单) ❌
+   - 合计: 6,808.62
+
+   2026-04-25 (正常日):
+   - Customer A: 6,170.67 (52 订单)
+   - Customer B: 12,696.56 (84 订单) ✅
+   - 合计: 18,867.23
+   ```
+
+---
+
+### **Bug 诊断**
+
+**`load_customer_b_orders` 加载器只加载了 USD 货币的订单，完全跳过了所有 EUR 订单！**
+
+- 源文件中有 75 条 EUR 订单（占 93.75%）
+- 这些 EUR 订单在数据库中**完全缺失**
+- 导致 Customer B 的收入从正常的 ~12,000 美元暴跌到 1,044.62 美元
+
+**可能的 Bug 原因：**
+- 加载器可能有货币过滤逻辑，错误地只处理 USD
+- 或者 EUR 行的解析失败被静默忽略
+- 需要检查 `load_customer_b_orders` 的代码逻辑
+
+---
+
+### **影响范围**
+
+- **直接影响**: `customer_b_orders_raw` 表缺失 75 条订单
+- **下游影响**: `daily_metrics.total_revenue` 和 `total_orders` 字段严重低估
+- **数据完整性**: 今天的报表数据**不可信**
+
+---
+
+### **建议修复步骤**
+
+1. **立即修复** `load_customer_b_orders` 加载器，确保正确处理 EUR 货币
+2. **重新加载** 2026-04-26 的 customer_b 数据
+3. **重新运行** `agg_orders_daily` ETL job 以更新 `daily_metrics`
+4. **回溯检查** 之前的日期是否也有类似问题
+
+you> daily_metrics.total_events 在上游来源是哪里？
+[04/27/26 08:04:11] INFO     Processing request of type CallToolRequest                                                               server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+
+agent> ## **`daily_metrics.total_events` 的上游来源**
+
+根据 `_field_lineage` 表的记录：
+
+### **数据血缘**
+
+**目标字段**: `daily_metrics.total_events`
+
+**上游来源** (2个源表):
+
+1. **`s3_clickstream_raw.event_id`**
+   - 数据源: `s3://events/clickstream`
+   - 文件位置: `/Users/xlisp/PyPro/data-trace-agent/data/sources/s3_clickstream`
+   - 加载器: `load_s3_clickstream`
+   - 格式: NDJSON (每行一个事件: `{event_id, user_id, page, ts}`)
+
+2. **`app_logs_raw.log_id`**
+   - 数据源: `fluentd://app-logs`
+   - 文件位置: `/Users/xlisp/PyPro/data-trace-agent/data/sources/app_logs`
+   - 加载器: `load_app_logs`
+   - 格式: 纯文本日志 (`<ts> <level> <user_id|-> <action>` 每行一条)
+
+### **转换逻辑**
+
+- **ETL Job**: `agg_events_daily`
+- **计算方式**: `COUNT(*)` 对两个原始事件流进行计数，按 `event_date` 分组
+- **含义**: 统计每天来自 S3 点击流和应用日志的**总事件数**
+
+---
+
+**总结**: `total_events` 是 **S3 点击流事件** 和 **应用日志事件** 的总和。
+
+you>
+
