@@ -1,4 +1,7 @@
 
+## demo init data:
+
+```
 ~/PyPro/data-trace-agent main
 base ❯ python setup_warehouse.py
 [ok] warehouse: /Users/xlisp/PyPro/data-trace-agent/data/warehouse.db
@@ -12,7 +15,11 @@ base ❯ python setup_warehouse.py
      ('2026-04-22', 1431, 478, 130, 18410.17)
 [ok] customer_b: file=80 rows  ->  DB=5 rows  (bug: dropped non-USD)
 [ok] customer_a: file=51 rows  ->  DB=51 rows  (bug: amount int-truncated)
+```
 
+## Ask
+
+```
 
 ~/PyPro/data-trace-agent main*
 base ❯ python ./trace_agent.py
@@ -211,3 +218,108 @@ agent> ## **`daily_metrics.total_events` 的上游来源**
 
 you>
 
+```
+
+## Ask and print tools call
+
+```
+~/PyPro/data-trace-agent main 15m 54s
+base ❯ python ./trace_agent.py
+[04/27/26 08:16:50] INFO     Processing request of type ListToolsRequest                                                              server.py:713
+[04/27/26 08:16:50] INFO     Processing request of type ListToolsRequest                                                              server.py:713
+[ok] loaded 18 MCP tools: ['connect_database', 'execute_query', 'describe_table', 'add_field_lineage', 'trace_field_lineage', 'analyze_query_lineage', 'generate_sample_data', 'import_csv', 'export_table_to_csv', 'read_file', 'write_file', 'append_file', 'list_directory', 'get_file_info', 'execute_command', 'get_current_directory', 'create_directory', 'search_files_ag']
+/Users/xlisp/PyPro/data-trace-agent/./trace_agent.py:139: LangGraphDeprecatedSinceV10: create_react_agent has been moved to `langchain.agents`. Please update your import to `from langchain.agents import create_agent`. Deprecated in LangGraph V1.0 to be removed in V2.0.
+  agent = create_react_agent(_make_llm(), tools, prompt=SYSTEM_PROMPT)
+
+=== data-trace-agent ready ===
+Sample questions you can try:
+  - Today's total_revenue in daily_metrics looks low compared to last month. By how much, and why?
+  - Where does daily_metrics.total_events come from upstream? Show me the lineage.
+  - For today's customer_b_orders_raw rows, do the DB amounts match the upstream source file? If they differ, why?
+  - For today's customer_a_orders_raw rows, do the DB amounts match the upstream source file exactly? Pick a few primary keys and compare.
+Type your question (blank line / Ctrl-D to quit).
+
+you> 对于今天 customer_a_orders_raw 中的行，数据库里的金额和上游源文件里的完全一致吗？如果不一致，请指出是哪个加载器的问题，并解释这个 bug。
+
+
+[tool-call] describe_table
+  table_name: customer_a_orders_raw
+  args: {"db_path": "/Users/xlisp/PyPro/data-trace-agent/data/warehouse.db"}
+
+[tool-call] execute_query
+  query: SELECT * FROM _source_registry WHERE source_table = 'customer_a_orders_raw'
+  args: {"db_path": "/Users/xlisp/PyPro/data-trace-agent/data/warehouse.db"}
+
+[tool-call] execute_query
+  query:
+    SELECT * FROM customer_a_orders_raw WHERE date(order_date) = '2026-04-26' ORDER BY order_id
+  args: {"db_path": "/Users/xlisp/PyPro/data-trace-agent/data/warehouse.db"}
+[04/27/26 08:17:12] INFO     Processing request of type CallToolRequest                                                               server.py:713
+[04/27/26 08:17:12] INFO     Processing request of type CallToolRequest                                                               server.py:713
+[04/27/26 08:17:12] INFO     Processing request of type CallToolRequest                                                               server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+[tool-result:execute_query] [{'type': 'text', 'text': 'Error executing query: no such column: order_date', 'id': 'lc_83a89b9d-cd98-4a00-8691-4c51dbbb2974'}]
+[tool-result:describe_table] [{'type': 'text', 'text': 'Table: customer_a_orders_raw\nRow count: 1553\nColumns:\n[\n  {\n    "name": "order_id",\n    "type": "INTEGER",\n    "nullable": true,\n    "default": null,\n    "primary_key": true\n  },\n  {\n    "name": "user_id",\n    "type": "INTEGER",\n    "nullable": false,\n    "default": null,\n    "primary_key": false\n  },\n  {\n    "name": "amount",\n    "type": "REAL",\n    "nullable": false,\n    "default": null,\n    "primary_key": false\n  },\n  {\n    "name": "ts",\n    "type": "TEXT",\n    "nullable": false,\n    "default": null,\n    "primary_key": false\n  },\n  {\n    "name": "source",\n    "type": "TEXT",\n    "nullable": false,\n    "default": "\'sftp://customer-a/orders\'",\n    "primary_key": false\n  }\n]', 'id': 'lc_c97d1793-f042-45e9-85e2-3324de31a7b7... [+3 chars truncated]
+[tool-result:execute_query] [{'type': 'text', 'text': 'Query executed successfully.\nResults:\n[\n  {\n    "source_table": "customer_a_orders_raw",\n    "source_uri": "sftp://customer-a/orders",\n    "file_dir": "/Users/xlisp/PyPro/data-trace-agent/data/sources/customer_a",\n    "loader": "load_customer_a_orders",\n    "schema_note": "CSV with header: order_id,user_id,amount,currency,ts. All amounts USD with 2 decimals."\n  }\n]', 'id': 'lc_03c1f558-c9ee-4370-9b4e-f5b2a2192a85'}]
+
+[tool-call] execute_query
+  query:
+    SELECT * FROM customer_a_orders_raw WHERE date(ts) = '2026-04-26' ORDER BY order_id
+  args: {"db_path": "/Users/xlisp/PyPro/data-trace-agent/data/warehouse.db"}
+
+[tool-call] read_file
+  file_path: /Users/xlisp/PyPro/data-trace-agent/data/sources/customer_a/2026-04-26.csv
+[04/27/26 08:17:18] INFO     Processing request of type CallToolRequest                                                               server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+[04/27/26 08:17:18] INFO     Processing request of type CallToolRequest                                                               server.py:713
+                    INFO     Processing request of type ListToolsRequest                                                              server.py:713
+[tool-result:read_file] [{'type': 'text', 'text': 'File: /Users/xlisp/PyPro/data-trace-agent/data/sources/customer_a/2026-04-26.csv\nSize: 2195 characters\n\norder_id,user_id,amount,currency,ts\n7000000,309,119.06,USD,2026-04-26T07:17:28\n7000001,29,100.88,USD,2026-04-26T00:13:59\n7000002,396,148.09,USD,2026-04-26T01:02:03\n7000003,443,121.74,USD,2026-04-26T00:44:11\n7000004,123,94.21,USD,2026-04-26T06:08:55\n7000005,104,105.57,USD,2026-04-26T08:10:27\n7000006,50,66.99,USD,2026-04-26T23:53:02\n7000007,66,154.72,USD,2026-04-26T22:05:17\n7000008,53,83.47,USD,2026-04-26T00:23:02\n7000009,359,181.13,USD,2026-04-26T17:35:49\n7000010,267,109.67,USD,2026-04-26T23:22:04\n7000011,456,72.76,USD,2026-04-26T22:44:31\n7000012,294,114.74,USD,2026-04-26T18:42:04\n7000013,356,41.39,USD,2026-04-26T13:36:09\n7000014,355,51.96,USD,... [+1633 chars truncated]
+[tool-result:execute_query] [{'type': 'text', 'text': 'Query executed successfully.\nResults:\n[\n  {\n    "order_id": 7000000,\n    "user_id": 309,\n    "amount": 119.0,\n    "ts": "2026-04-26T07:17:28",\n    "source": "sftp://customer-a/orders"\n  },\n  {\n    "order_id": 7000001,\n    "user_id": 29,\n    "amount": 100.0,\n    "ts": "2026-04-26T00:13:59",\n    "source": "sftp://customer-a/orders"\n  },\n  {\n    "order_id": 7000002,\n    "user_id": 396,\n    "amount": 148.0,\n    "ts": "2026-04-26T01:02:03",\n    "source": "sftp://customer-a/orders"\n  },\n  {\n    "order_id": 7000003,\n    "user_id": 443,\n    "amount": 121.0,\n    "ts": "2026-04-26T00:44:11",\n    "source": "sftp://customer-a/orders"\n  },\n  {\n    "order_id": 7000004,\n    "user_id": 123,\n    "amount": 94.0,\n    "ts": "2026-04-26T06:08:55",\n... [+7244 chars truncated]
+
+agent> 完美！现在我可以对比数据库和源文件中的金额了。让我详细比较几个订单：
+
+## 发现的问题：**金额数据不一致！**
+
+数据库中的金额与上游源文件**完全不一致**。所有金额都被错误地截断为整数，丢失了小数部分。
+
+### 具体对比（前10个订单）：
+
+| order_id | 源文件金额 | 数据库金额 | 差异 |
+|----------|-----------|-----------|------|
+| 7000000 | **119.06** | 119.0 | -0.06 |
+| 7000001 | **100.88** | 100.0 | -0.88 |
+| 7000002 | **148.09** | 148.0 | -0.09 |
+| 7000003 | **121.74** | 121.0 | -0.74 |
+| 7000004 | **94.21** | 94.0 | -0.21 |
+| 7000005 | **105.57** | 105.0 | -0.57 |
+| 7000006 | **66.99** | 66.0 | -0.99 |
+| 7000007 | **154.72** | 154.0 | -0.72 |
+| 7000008 | **83.47** | 83.0 | -0.47 |
+| 7000009 | **181.13** | 181.0 | -0.13 |
+
+### 问题根源：
+
+**加载器：** `load_customer_a_orders`
+**源 URI：** `sftp://customer-a/orders`
+
+### Bug 解释：
+
+`load_customer_a_orders` 加载器在解析 CSV 文件时，**错误地将 amount 字段作为整数处理**，而不是浮点数。这导致所有金额的小数部分被截断。
+
+根据 `_source_registry` 的 schema_note，源文件明确说明："All amounts USD with 2 decimals"（所有金额都是美元，带2位小数）。但加载器显然没有正确处理这个格式，可能使用了 `int()` 而不是 `float()` 来解析 amount 列。
+
+### 影响：
+
+- 今天（2026-04-26）的51个订单全部受影响
+- 每个订单损失 0.01 到 0.99 美元不等
+- 这会导致下游的 `daily_metrics.total_revenue` 统计不准确，系统性地低估了实际收入
+
+**建议修复：** 修改 `load_customer_a_orders` 加载器，确保将 CSV 中的 amount 字段解析为 `float` 类型，而不是 `int` 类型。
+
+you>
+~/PyPro/data-trace-agent main 44s
+base ❯
+
+```
